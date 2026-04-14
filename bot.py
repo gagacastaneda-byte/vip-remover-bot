@@ -22,10 +22,11 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = int(context.args[0])
     days = int(context.args[1])
+    username = context.args[2] if len(context.args) > 2 else str(user_id)
     expiry = datetime.now() + timedelta(days=days)
-    members[user_id] = expiry
+    members[user_id] = {"expiry": expiry, "username": username}
     notified[user_id] = []
-    await update.message.reply_text(f"✅ Membre {user_id} ajouté pour {days} jours (expire le {expiry.strftime('%d/%m/%Y')})")
+    await update.message.reply_text(f"✅ {username} ajouté pour {days} jours (expire le {expiry.strftime('%d/%m/%Y')})")
 
 async def extend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -33,11 +34,13 @@ async def extend(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = int(context.args[0])
     days = int(context.args[1])
     if user_id in members:
-        members[user_id] += timedelta(days=days)
+        members[user_id]["expiry"] += timedelta(days=days)
+        username = members[user_id]["username"]
     else:
-        members[user_id] = datetime.now() + timedelta(days=days)
+        username = str(user_id)
+        members[user_id] = {"expiry": datetime.now() + timedelta(days=days), "username": username}
     notified[user_id] = []
-    await update.message.reply_text(f"✅ Accès prolongé de {days} jours pour {user_id}")
+    await update.message.reply_text(f"✅ Accès prolongé de {days} jours pour {username}")
 
 async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -46,14 +49,14 @@ async def check(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Aucun membre actif.")
         return
     msg = "📋 Membres actifs :\n"
-    for uid, exp in members.items():
-        msg += f"• {uid} → expire le {exp.strftime('%d/%m/%Y')}\n"
+    for uid, data in members.items():
+        msg += f"• {data['username']} (ID: {uid}) → expire le {data['expiry'].strftime('%d/%m/%Y')}\n"
     await update.message.reply_text(msg)
 
 async def send_reminders(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.now()
-    for uid, exp in list(members.items()):
-        days_left = (exp - now).days
+    for uid, data in list(members.items()):
+        days_left = (data["expiry"] - now).days
         for d in [3, 2, 1]:
             if days_left == d and d not in notified.get(uid, []):
                 try:
@@ -68,15 +71,16 @@ async def send_reminders(context: ContextTypes.DEFAULT_TYPE):
 async def kick_expired(context: ContextTypes.DEFAULT_TYPE):
     chat_id = context.job.data
     now = datetime.now()
-    expired = [uid for uid, exp in list(members.items()) if exp < now]
+    expired = [uid for uid, data in list(members.items()) if data["expiry"] < now]
     for uid in expired:
+        username = members[uid]["username"]
         try:
             await context.bot.ban_chat_member(chat_id=chat_id, user_id=uid)
             await context.bot.unban_chat_member(chat_id=chat_id, user_id=uid)
             del members[uid]
             notified.pop(uid, None)
             await context.bot.send_message(chat_id=uid, text="❌ Ton accès VIP a expiré. Contacte l'admin pour renouveler.")
-            await context.bot.send_message(chat_id=ADMIN_ID, text=f"😢 {uid} nous a quittés... En espérant que ça ne dure pas trop longtemps !(accès expiré)")
+            await context.bot.send_message(chat_id=ADMIN_ID, text=f"😢 {username} nous a quittés... En espérant que ça ne dure pas trop longtemps !")
         except Exception as e:
             print(f"Erreur pour {uid}: {e}")
 
