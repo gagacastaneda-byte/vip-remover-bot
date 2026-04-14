@@ -76,7 +76,7 @@ async def kick_expired(context: ContextTypes.DEFAULT_TYPE):
             del members[uid]
             notified.pop(uid, None)
             await context.bot.send_message(chat_id=uid, text="❌ Ton accès VIP a expiré. Contacte l'admin pour renouveler.")
-            await context.bot.send_message(chat_id=ADMIN_ID, text=f"⛔ {uid} a été exclu (accès expiré)")
+            await context.bot.send_message(chat_id=ADMIN_ID, text=f"😢 {uid} nous a quittés... En espérant que ça ne dure pas trop longtemps !(accès expiré)")
         except Exception as e:
             print(f"Erreur pour {uid}: {e}")
 
